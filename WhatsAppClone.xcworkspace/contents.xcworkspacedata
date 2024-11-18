@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:App/WhatsAppClone.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:DependencyPackage">
+   </FileRef>
+   <FileRef
+      location = "group:Models">
+   </FileRef>
+   <FileRef
+      location = "group:UIComponentsPackage">
+   </FileRef>
+   <FileRef
+      location = "group:WhatsAppFeatures">
+   </FileRef>
+</Workspace>
