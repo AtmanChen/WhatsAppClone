@@ -21,20 +21,8 @@ public struct MessageImageBubble: View {
 
 	public var body: some View {
 		HStack(alignment: .bottom, spacing: 6) {
-			if let profileImageUrl {
-				KFImage.url(URL(string: profileImageUrl))
-					.placeholder {
-						Image(systemName: "person.circle.fill")
-							.resizable()
-							.frame(width: 30, height: 30)
-					}
-					.fade(duration: 0.25)
-					.resizable()
-					.scaledToFill()
-					.clipShape(Circle())
-					.frame(width: 30, height: 30)
-					.offset(y: 5)
-			}
+			profileImageView()
+				.opacity(messageItem.direction == .incoming ? 1 : 0)
 			messageTextView()
 				.shadow(color: Color(.systemGray3).opacity(0.1), radius: 5, x: 0, y: 20)
 				.overlay {
@@ -64,6 +52,27 @@ public struct MessageImageBubble: View {
 					}
 				}
 			}
+		}
+	}
+	
+	@ViewBuilder
+	private func profileImageView() -> some View {
+		if let profileImageUrl {
+			KFImage.url(URL(string: profileImageUrl))
+				.placeholder {
+					Image(systemName: "person.circle.fill")
+						.resizable()
+						.frame(width: 30, height: 30)
+				}
+				.fade(duration: 0.25)
+				.resizable()
+				.scaledToFill()
+				.clipShape(Circle())
+				.frame(width: 30, height: 30)
+		} else {
+			Image(systemName: "person.circle.fill")
+				.resizable()
+				.frame(width: 30, height: 30)
 		}
 	}
 	

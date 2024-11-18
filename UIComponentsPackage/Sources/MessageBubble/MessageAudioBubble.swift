@@ -41,19 +41,10 @@ public struct MessageAudioBubble: View {
 		let bubbleWidth = contentWidth / 1.5
 		VStack(alignment: messageItem.messageHorizontalAlignment, spacing: 3) {
 			HStack(alignment: .bottom) {
-				if let profileImageUrl {
-					KFImage.url(URL(string: profileImageUrl))
-						.placeholder {
-							Image(systemName: "person.circle.fill")
-								.resizable()
-						}
-						.fade(duration: 0.25)
-						.resizable()
-						.scaledToFill()
-						.clipShape(Circle())
-						.frame(width: 30, height: 30)
-				}
+				profileImageView()
+					.opacity(messageItem.direction == .incoming ? 1 : 0)
 				HStack {
+					
 					playButton()
 					Slider(value: sliderValue, in: sliderRange)
 						.tint(.gray)
@@ -97,6 +88,26 @@ public struct MessageAudioBubble: View {
 					}
 				}
 			}
+		}
+	}
+	
+	@ViewBuilder
+	private func profileImageView() -> some View {
+		if let profileImageUrl {
+			KFImage.url(URL(string: profileImageUrl))
+				.placeholder {
+					Image(systemName: "person.circle.fill")
+						.resizable()
+				}
+				.fade(duration: 0.25)
+				.resizable()
+				.scaledToFill()
+				.clipShape(Circle())
+				.frame(width: 30, height: 30)
+		} else {
+			Image(systemName: "person.circle.fill")
+				.resizable()
+				.frame(width: 30, height: 30)
 		}
 	}
 

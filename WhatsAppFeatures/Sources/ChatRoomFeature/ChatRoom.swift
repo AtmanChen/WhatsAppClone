@@ -258,7 +258,7 @@ public struct ChatRoom {
 				} else {
 					if let currentBubbleTag = state.audioPlay?.bubbleTag {
 						if currentBubbleTag == bubbleTag {
-							return isPlaying ? .send(.audioPlay(.play)): .send(.audioPlay(.pause))
+							return isPlaying ? .send(.audioPlay(.play)) : .send(.audioPlay(.pause))
 						} else {
 							return .send(.audioPlay(.setURL(bubbleTag, audioFileURL, audioDuration)))
 						}
@@ -310,7 +310,7 @@ public struct ChatRoom {
 			case .updateMessageAttachmentsIsEmpty:
 				let isMessageAttachmentsEmpty = state.mediaAttachmentPreview == nil
 				return .send(.messageInputArea(.updateMessageAttachmentsIsEmpty(isMessageAttachmentsEmpty)))
-				
+
 			case let .presentAudioPlay(bubbleTag, url, duration):
 				state.audioPlay = AudioPlayerReducer.State()
 				return .send(.audioPlay(.setURL(bubbleTag, url, duration)))
@@ -345,7 +345,6 @@ public struct ChatRoomScreen: View {
 			leadingNavItems()
 			trailingNavItems()
 		}
-		.toolbar(.hidden, for: .tabBar)
 		.animation(.snappy(duration: 0.25, extraBounce: 0), value: store.mediaAttachmentPreview != nil)
 		.photosPicker(isPresented: $store.showPhotosPicker, selection: $store.photoPickerItems, maxSelectionCount: 6, photoLibrary: .shared())
 		.fullScreenCover(item: $store.playAttachment) { videoAttachment in
@@ -431,4 +430,3 @@ extension ChatRoomScreen {
 		)
 	}
 }
-

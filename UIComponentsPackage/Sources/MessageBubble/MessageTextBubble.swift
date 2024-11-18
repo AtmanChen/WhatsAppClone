@@ -15,26 +15,14 @@ public struct MessageTextBubbleView: View {
 	}
 
 	public var body: some View {
-		HStack {
+		HStack(alignment: .bottom, spacing: 6) {
+			profileImageView()
+				.opacity(messageItem.direction == .outgoing ? 0 : 1)
 			if messageItem.direction == .outgoing {
+				Spacer()
 				timestampTextView()
 			}
-			HStack(alignment: .bottom, spacing: 6) {
-				if let profileImageUrl {
-					KFImage.url(URL(string: profileImageUrl))
-						.placeholder {
-							Image(systemName: "person.circle.fill")
-								.resizable()
-								.frame(width: 30, height: 30)
-						}
-						.fade(duration: 0.25)
-						.resizable()
-						.scaledToFill()
-						.clipShape(Circle())
-						.frame(width: 30, height: 30)
-				}
-				messageContent()
-			}
+			messageContent()
 			if messageItem.direction == .incoming {
 				timestampTextView()
 			}
@@ -52,6 +40,27 @@ public struct MessageTextBubbleView: View {
 					}
 				}
 			}
+		}
+	}
+
+	@ViewBuilder
+	private func profileImageView() -> some View {
+		if let profileImageUrl {
+			KFImage.url(URL(string: profileImageUrl))
+				.placeholder {
+					Image(systemName: "person.circle.fill")
+						.resizable()
+						.frame(width: 30, height: 30)
+				}
+				.fade(duration: 0.25)
+				.resizable()
+				.scaledToFill()
+				.clipShape(Circle())
+				.frame(width: 30, height: 30)
+		} else {
+			Image(systemName: "person.circle.fill")
+				.resizable()
+				.frame(width: 30, height: 30)
 		}
 	}
 
