@@ -3,11 +3,11 @@ import DatabaseClient
 import Dependencies
 import FirebaseAuthClient
 import FirebaseDatabase
-import UserModels
+import FirebaseFileUpload
+import FirebaseFileUploaderClient
 import FirebaseUserInfoClient
 import MessageModels
-import FirebaseFileUploaderClient
-import FirebaseFileUpload
+import UserModels
 
 extension ChannelClient: DependencyKey {
 	public static var liveValue = ChannelClient(
@@ -25,9 +25,10 @@ extension ChannelClient: DependencyKey {
 				throw ChannelError.failedToGenerateChannelCreatedMessageId
 			}
 			if partners.count == 1,
-				 let partner = partners.first,
-				 let snapshotValue = try await databaseClient.userDirectChannelsRef().child(currentUid).child(partner.uid).getData().value as? [String: Bool],
-				 let channelId = snapshotValue.keys.first {
+			   let partner = partners.first,
+			   let snapshotValue = try await databaseClient.userDirectChannelsRef().child(currentUid).child(partner.uid).getData().value as? [String: Bool],
+			   let channelId = snapshotValue.keys.first
+			{
 				let channelDict = try await databaseClient.channelsRef().child(channelId).getData().value as! [String: Any]
 				var channel = ChannelItem(from: channelDict)
 				return channel
@@ -58,7 +59,8 @@ extension ChannelClient: DependencyKey {
 				"ownerUid": currentUid
 			]
 			if let senderData = try? JSONEncoder().encode(currentUser),
-				 let senderJSON = String(data: senderData, encoding: .utf8) {
+			   let senderJSON = String(data: senderData, encoding: .utf8)
+			{
 				messageDict["sender"] = senderJSON
 			}
 			try await databaseClient.channelsRef().child(channelId).setValue(channelDict)
@@ -140,7 +142,8 @@ extension ChannelClient: DependencyKey {
 				throw ChannelError.currentUserNotFound
 			}
 			if let senderData = try? JSONEncoder().encode(currentUser),
-				 let senderJSON = String(data: senderData, encoding: .utf8) {
+			   let senderJSON = String(data: senderData, encoding: .utf8)
+			{
 				messageDict["sender"] = senderJSON
 			}
 			@Dependency(\.databaseClient) var databaseClient
@@ -180,7 +183,7 @@ extension ChannelClient: DependencyKey {
 					let channelDict: [String: Any] = [
 						"lastMessage": messageParams.text,
 						"lastMessageTimestamp": now.timeIntervalSince1970,
-						"lastMessageType": messageParams.type.title,
+						"lastMessageType": messageParams.type.title
 					]
 					var messageDict: [String: Any] = [
 						"text": messageParams.text,
@@ -194,7 +197,8 @@ extension ChannelClient: DependencyKey {
 					]
 					
 					if let senderData = try? JSONEncoder().encode(currentUser),
-						 let senderJSON = String(data: senderData, encoding: .utf8) {
+					   let senderJSON = String(data: senderData, encoding: .utf8)
+					{
 						messageDict["sender"] = senderJSON
 					}
 					messageDict["thumbnailWidth"] = messageParams.thumbnailWidth ?? nil
@@ -205,22 +209,68 @@ extension ChannelClient: DependencyKey {
 				}
 			}
 		},
-		getMessagesOfChannel: { channelId in
+		listenToLatestMessageOfChannel: { channelId in
 			AsyncStream { continuation in
 				@Dependency(\.databaseClient) var databaseClient
 				let messagesRef = databaseClient.messagesRef()
-				let handle = messagesRef.child(channelId).queryOrdered(byChild: "timestamp").observe(.childAdded, with: { snapshot in
-					guard let dict = snapshot.value as? [String: Any] else {
+				Task {
+					let lastMessageQuery = messagesRef
+						.child(channelId)
+						.queryOrdered(byChild: "timestamp")
+						.queryLimited(toLast: 1)
+					
+					guard let snapshot = try await lastMessageQuery.getData().children.allObjects.first as? DataSnapshot,
+					      let lastTimestamp = (snapshot.value as? [String: Any])?["timestamp"] as? TimeInterval
+					else {
 						return
 					}
-					@Dependency(\.firebaseAuthClient.currentUser) var currentUser
-					let message = MessageItem(id: snapshot.key, currentUid: currentUser()!.uid, dict: dict)
-					continuation.yield(message)
-				})
-				continuation.onTermination = { [weak messagesRef] _ in
-					messagesRef?.removeObserver(withHandle: handle)
+					let handle = messagesRef
+						.child(channelId)
+						.queryOrdered(byChild: "timestamp")
+						.queryStarting(afterValue: lastTimestamp)
+						.observe(.childAdded, with: { snapshot in
+							guard let dict = snapshot.value as? [String: Any] else {
+								return
+							}
+							@Dependency(\.firebaseAuthClient.currentUser) var currentUser
+							let message = MessageItem(id: snapshot.key, currentUid: currentUser()!.uid, dict: dict)
+							continuation.yield(message)
+						})
+					continuation.onTermination = { [weak messagesRef] _ in
+						messagesRef?.removeObserver(withHandle: handle)
+					}
 				}
 			}
+		},
+		getHistoricalMessagesOfChannel: { channelId, lastCursor, pageCount in
+			@Dependency(\.databaseClient) var databaseClient
+			@Dependency(\.firebaseAuthClient.currentUser) var currentUser
+			let query: DatabaseQuery
+			if let lastCursor {
+				query = databaseClient
+					.messagesRef()
+					.child(channelId)
+					.queryOrderedByKey()
+					.queryEnding(atValue: lastCursor)
+					.queryLimited(toLast: pageCount)
+			} else {
+				query = databaseClient
+					.messagesRef()
+					.child(channelId)
+					.queryLimited(toLast: pageCount)
+			}
+			
+			let snapshot = try await query.getData()
+			let messages = snapshot.children
+				.compactMap { $0 as? DataSnapshot }
+				.compactMap { (messageSnapshot: DataSnapshot) -> MessageItem? in
+					guard let dict = messageSnapshot.value as? [String: Any] else {
+						return nil
+					}
+					let message = MessageItem(id: messageSnapshot.key, currentUid: currentUser()!.uid, dict: dict)
+					return message
+				}
+			return messages.reversed()
 		}
 	)
 }

@@ -54,6 +54,8 @@ public extension MediaAttachment {
 	}
 }
 
+private let historicalMessagesPageCount: UInt = 20
+
 @Reducer
 public struct ChatRoom {
 	public init() {}
@@ -66,6 +68,8 @@ public struct ChatRoom {
 		var playAttachment: MediaAttachment?
 		var photoPickerItems: [PhotosPickerItem] = []
 		var audioPlay: AudioPlayerReducer.State?
+		var currentMessageCursor: String?
+		var historicalMessagesRemains = false
 		public init(channel: ChannelItem) {
 			self.channel = channel
 			let infoItem = channel.isGroupChat ? ComponentsListenItem.channelItem(channel) : ComponentsListenItem.userItem(channel.membersExcludingMe.first!)
@@ -85,13 +89,14 @@ public struct ChatRoom {
 		case clearAttachments
 		case task
 		case mediaAttachmentPreview(MediaAttachmentPreviewReducer.Action)
-		case messagesResponse(MessageItem)
+		case messagesResponse(messages: [MessageItem], fromLatest: Bool)
 		case messageInputArea(ChatTextInputArea.Action)
 		case messageList(MessageListReducer.Action)
 		case channelInfo(StackAvatarUserNameBioReducer.Action)
 		case onTapNavigationBackButton
 		case presentMediaAttachmentPreview([MediaAttachment])
 		case stopPlayAttachment
+		case loadHistorialMessages
 		case presentAudioPlay(String, URL, TimeInterval)
 		case dismissAudioPlay
 		case updateMessageAttachmentsIsEmpty
@@ -104,7 +109,8 @@ public struct ChatRoom {
 
 	@Dependency(\.channelClient.sendTextMessageToChannel) var sendTextMessage
 	@Dependency(\.channelClient.sendAttachmentsMessageToChannel) var sendAttachmentsMessageToChannel
-	@Dependency(\.channelClient.getMessagesOfChannel) var getMessages
+	@Dependency(\.channelClient.listenToLatestMessageOfChannel) var listenToLatestMessageOfChannel
+	@Dependency(\.channelClient.getHistoricalMessagesOfChannel) var getHistoricalMessagesOfChannel
 	@Dependency(\.firebaseAuthClient.currentUser) var currentUser
 	@Dependency(\.userInfoClient.getUser) var getUser
 	@Dependency(\.dismiss) var dismiss
@@ -124,6 +130,9 @@ public struct ChatRoom {
 			state,
 				action in
 			switch action {
+			case .messageList(.delegate(.loadMoreHistoricalMessages)):
+				debugPrint("loadMoreHistoricalMessages")
+				return .send(.loadHistorialMessages)
 			case let .messageList(.delegate(.updateAudioPlaybackCurrentTime(_, currentTime))):
 				return .send(.audioPlay(.seekTo(currentTime)))
 			case let .messageList(.delegate(.toggleAudioPlayStatus(bubbleTag, audioFilePath, isPlaying, duration))):
@@ -154,13 +163,14 @@ public struct ChatRoom {
 				return .none
 			case .task:
 				return .run { [channelId = state.channel.id] send in
+					async let loadHistoricalMessages: Void = send(.loadHistorialMessages)
 					async let sendChannelInfo: Void = send(.channelInfo(.loadInfo))
 					async let subscribeMessages: Void = {
-						for await updateMessages in getMessages(channelId) {
-							await send(.messagesResponse(updateMessages))
+						for await updateMessage in listenToLatestMessageOfChannel(channelId) {
+							await send(.messagesResponse(messages: [updateMessage], fromLatest: true))
 						}
 					}()
-					_ = await (sendChannelInfo, subscribeMessages)
+					_ = await (loadHistoricalMessages, sendChannelInfo, subscribeMessages)
 				}.cancellable(id: Cancel.task, cancelInFlight: true)
 			case let .cancelTask(cancelId):
 				return Effect.cancel(id: cancelId)
@@ -191,6 +201,11 @@ public struct ChatRoom {
 				return .none
 			case .channelInfo:
 				return .none
+			case .loadHistorialMessages:
+				return .run { [channelId = state.channel.id, currentMessageCursor = state.currentMessageCursor] send in
+					let messages = try await getHistoricalMessagesOfChannel(channelId, currentMessageCursor, historicalMessagesPageCount)
+					await send(.messagesResponse(messages: messages, fromLatest: false))
+				}
 			case .messageInputArea(.delegate(.onTapMediaAttachmentButton)):
 				state.showPhotosPicker = true
 				return .none
@@ -253,9 +268,14 @@ public struct ChatRoom {
 				}
 			case .messageList:
 				return .none
-			case let .messagesResponse(updateMessage):
-				state.messageList.messages.insert(MessageListItemReducer.State(message: updateMessage), at: 0)
-				return .none
+			case let .messagesResponse(messages, fromLatest):
+				if !fromLatest {
+					state.historicalMessagesRemains = messages.count <= historicalMessagesPageCount
+					if let lastMessage = messages.last {
+						state.currentMessageCursor = lastMessage.id
+					}
+				}
+				return .send(.messageList(.messagesUpdated(messages: messages, fromLatest: fromLatest, historialMessagesRemains: state.historicalMessagesRemains)))
 			case let .mediaAttachmentPreview(.delegate(.playAttachment(attachment))):
 				if case let .audio(url, duration) = attachment {
 					return .send(.presentAudioPlay("", url, duration), animation: .easeInOut(duration: 0.25))

@@ -55,5 +55,8 @@ public struct ChannelClient {
 	public var addCurrentUserChannelsListener: @Sendable () -> AsyncStream<[ChannelItem]> = { .never }
 	public var sendTextMessageToChannel: @Sendable (_ channelItem: ChannelItem, _ from: UserItem, _ textMessage: String) async throws -> Void
 	public var sendAttachmentsMessageToChannel: @Sendable (MessageUploadParams) async throws -> Void
-	public var getMessagesOfChannel: @Sendable (_ channelId: String) -> AsyncStream<MessageItem> = { _ in .never }
+	public var listenToLatestMessageOfChannel: @Sendable (_ channelId: String) -> AsyncStream<MessageItem> = { _ in .never }
+	public var getHistoricalMessagesOfChannel: @Sendable (_ channelId: String, _ lastCursor: String?, _ pageSize: UInt) async throws -> [MessageItem] = { _, _, _ in [] }
 }
+
+
