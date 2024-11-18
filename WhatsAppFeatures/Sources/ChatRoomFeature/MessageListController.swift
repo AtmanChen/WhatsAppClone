@@ -70,7 +70,7 @@ public struct MessageListReducer {
 			case loadMoreHistoricalMessages
 		}
 	}
-	
+
 	private enum LoadMoreHistoricalMessages {
 		case ID
 	}
@@ -122,9 +122,8 @@ public struct MessageListReducer {
 				return .send(.delegate(.toggleAudioPlayStatus(bubbleTag: bubbleTag, audioFilePath: audioFilePath, isPlaying: isPlaying, duration: duration)))
 			case .onTapChatBackground:
 				return .send(.delegate(.onTapChatBackground))
-				
+
 			case .loadMoreHistoricalMessages:
-				debugPrint(state.isLoadingHistoricalMessages)
 				if state.isLoadingHistoricalMessages {
 					return .none
 				}
@@ -313,6 +312,23 @@ public final class MessageListController: UIViewController {
 		}
 	}
 
+	private let pullDownHUDView: UIButton = {
+		var buttonConfig = UIButton.Configuration.filled()
+		var imageConfig = UIImage.SymbolConfiguration(pointSize: 10, weight: .black)
+		let image = UIImage(systemName: "arrow.up.circle.fill", withConfiguration: imageConfig)
+		buttonConfig.image = image
+		buttonConfig.baseBackgroundColor = UIColor(Appearance.Colors.bubbleGreen)
+		buttonConfig.baseForegroundColor = UIColor(Appearance.Colors.whatsAppBlack)
+		buttonConfig.imagePadding = 5
+		buttonConfig.cornerStyle = .capsule
+		let font = UIFont.systemFont(ofSize: 12, weight: .black)
+		buttonConfig.attributedTitle = AttributedString("Pull Down", attributes: AttributeContainer([NSAttributedString.Key.font: font]))
+		let button = UIButton(configuration: buttonConfig)
+		button.translatesAutoresizingMaskIntoConstraints = false
+		button.alpha = 0
+		return button
+	}()
+
 	private func setupView() {
 		view.backgroundColor = .clear
 		let chatBackgroundImageView = UIImageView(image: Appearance.Images.chatBackground)
@@ -320,6 +336,7 @@ public final class MessageListController: UIViewController {
 		chatBackgroundImageView.contentMode = .scaleToFill
 		view.addSubview(chatBackgroundImageView)
 		view.addSubview(messagesCollectionView)
+		view.addSubview(pullDownHUDView)
 		NSLayoutConstraint.activate([
 			chatBackgroundImageView.topAnchor.constraint(equalTo: view.topAnchor),
 			chatBackgroundImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -329,6 +346,8 @@ public final class MessageListController: UIViewController {
 			messagesCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
 			messagesCollectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 			messagesCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+			pullDownHUDView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+			pullDownHUDView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
 		])
 	}
 
@@ -376,6 +395,7 @@ public extension MessageListController {
 	enum MessageListSection {
 		case main
 	}
+
 	private func loadMoreMessages() {
 		store.send(.loadMoreHistoricalMessages)
 	}
@@ -387,17 +407,35 @@ extension MessageListController: UICollectionViewDelegate {
 	}
 
 	public func scrollViewDidScroll(_ scrollView: UIScrollView) {
-		guard !isApplyingSnapshot else { return }
-		guard store.historialMessagesRemains else { return }
-		guard store.isLoadingHistoricalMessages == false else { return }
+		guard !isApplyingSnapshot else {
+			pullDownHUDView.alpha = 0
+			return
+		}
+		guard store.historialMessagesRemains else {
+			pullDownHUDView.alpha = 0
+			return
+		}
+		guard store.isLoadingHistoricalMessages == false else {
+			pullDownHUDView.alpha = 0
+			return
+		}
 		let position = scrollView.contentOffset.y
 		let contentHeight = scrollView.contentSize.height
 		let scrollViewHeight = scrollView.bounds.size.height
-
-		// 当滚动到底部时加载更多
-		if position > contentHeight - scrollViewHeight - 100 {
+		if position > contentHeight - scrollViewHeight - 300 {
+			pullDownHUDView.alpha = 1
+		} else {
+			pullDownHUDView.alpha = 0
+		}
+		if position > contentHeight - scrollViewHeight - 50 {
 			loadMoreMessages()
 		}
+//		if position > contentHeight - scrollViewHeight - 50 {
+//			pullDownHUDView.alpha = 1
+//		} else if position > contentHeight - scrollViewHeight - 100 {
+//			pullDownHUDView.alpha = 0
+//			loadMoreMessages()
+//		}
 	}
 }
 

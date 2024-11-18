@@ -203,7 +203,6 @@ extension ChannelClient: DependencyKey {
 					}
 					messageDict["thumbnailWidth"] = messageParams.thumbnailWidth ?? nil
 					messageDict["thumbnailHeight"] = messageParams.thumbnailHeight ?? nil
-					debugPrint(messageDict)
 					try await channelsRef.child(messageParams.channel.id).updateChildValues(channelDict)
 					try await messagesRef.child(messageParams.channel.id).child(messageId).setValue(messageDict)
 				}

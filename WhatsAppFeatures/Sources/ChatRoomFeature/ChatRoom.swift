@@ -131,7 +131,6 @@ public struct ChatRoom {
 				action in
 			switch action {
 			case .messageList(.delegate(.loadMoreHistoricalMessages)):
-				debugPrint("loadMoreHistoricalMessages")
 				return .send(.loadHistorialMessages)
 			case let .messageList(.delegate(.updateAudioPlaybackCurrentTime(_, currentTime))):
 				return .send(.audioPlay(.seekTo(currentTime)))
@@ -270,7 +269,7 @@ public struct ChatRoom {
 				return .none
 			case let .messagesResponse(messages, fromLatest):
 				if !fromLatest {
-					state.historicalMessagesRemains = messages.count <= historicalMessagesPageCount
+					state.historicalMessagesRemains = messages.count == historicalMessagesPageCount
 					if let lastMessage = messages.last {
 						state.currentMessageCursor = lastMessage.id
 					}
